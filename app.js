@@ -1,5 +1,10 @@
 // Portfolio JavaScript
 
+// --- Telegram contact configuration (client-side) ---
+const TELEGRAM_BOT_TOKEN = '8439590858:AAGRQKTzLsSiBllOgTr_SK2Jrjo-i11fh3Q'; // bot token (embedded client-side - insecure)
+const TELEGRAM_CHAT_ID  = '7140946566'; // numeric chat id where messages will be sent
+// ---------------------------------------------------
+
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize all functionality
     initNavbar();
@@ -170,12 +175,21 @@ LANGUAGES
     }
 }
 
-// Contact Form Handling
+// Helper: escape HTML for safe Telegram HTML parse_mode
+function escapeHtml(text) {
+    if (!text) return '';
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+// Contact Form Handling (updated to send message via Telegram bot)
 function initContactForm() {
     const contactForm = document.getElementById('contactForm');
 
     if (contactForm) {
-        contactForm.addEventListener('submit', function(e) {
+        contactForm.addEventListener('submit', async function(e) {
             e.preventDefault();
 
             const formData = new FormData(this);
@@ -188,18 +202,54 @@ function initContactForm() {
             }
 
             // Email validation
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            const emailRegex = /^[^s@]+@[^s@]+\.[^s@]+$/;
             if (!emailRegex.test(data.email)) {
                 alert('Please enter a valid email address.');
                 return;
             }
 
-            // In a real application, you would send this data to a server
-            // For now, we'll just show a success message
-            alert('Thank you for your message! I will get back to you soon.');
+            // Warn if token/chat not configured (should be set above)
+            if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+                alert('Telegram bot configuration is missing. Please configure TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID.');
+                return;
+            }
 
-            // Reset the form
-            this.reset();
+            // Prepare message text (HTML)
+            const messageText =
+                `<b>New portfolio message</b>\n` +
+                `<b>Name:</b> ${escapeHtml(data.name)}\n` +
+                `<b>Email:</b> ${escapeHtml(data.email)}\n` +
+                `<b>Subject:</b> ${escapeHtml(data.subject)}\n` +
+                `<b>Message:</b>\n${escapeHtml(data.message)}`;
+
+            const apiUrl = `https://api.telegram.org/bot${encodeURIComponent(TELEGRAM_BOT_TOKEN)}/sendMessage`;
+
+            try {
+                const res = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        chat_id: TELEGRAM_CHAT_ID,
+                        text: messageText,
+                        parse_mode: 'HTML'
+                    })
+                });
+
+                const json = await res.json();
+
+                if (res.ok && json.ok) {
+                    alert('Thank you! Your message was sent via Telegram.');
+                    this.reset();
+                } else {
+                    console.error('Telegram API error', json);
+                    alert('Failed to send message via Telegram. Please check console for details.');
+                }
+            } catch (err) {
+                console.error('Network error sending to Telegram', err);
+                alert('Network error while sending message. Please try again later.');
+            }
         });
     }
 }
@@ -280,7 +330,4 @@ document.addEventListener('DOMContentLoaded', function() {
     initHoverEffects();
 
     // Add loading animation
-    window.addEventListener('load', function() {
-        document.body.classList.add('loaded');
-    });
 });
